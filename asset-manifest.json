@@ -1,10 +1,13 @@
 {
   "files": {
-    "main.js": "/US-College-Optimizer-LP-Model/static/js/main.0512085c.js",
+    "main.css": "/US-College-Optimizer-LP-Model/static/css/main.baa7a8e2.css",
+    "main.js": "/US-College-Optimizer-LP-Model/static/js/main.0be71154.js",
     "index.html": "/US-College-Optimizer-LP-Model/index.html",
-    "main.0512085c.js.map": "/US-College-Optimizer-LP-Model/static/js/main.0512085c.js.map"
+    "main.baa7a8e2.css.map": "/US-College-Optimizer-LP-Model/static/css/main.baa7a8e2.css.map",
+    "main.0be71154.js.map": "/US-College-Optimizer-LP-Model/static/js/main.0be71154.js.map"
   },
   "entrypoints": [
-    "static/js/main.0512085c.js"
+    "static/css/main.baa7a8e2.css",
+    "static/js/main.0be71154.js"
   ]
 }
