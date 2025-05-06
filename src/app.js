@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import csvData from './data/College_admission.js';
+import csvData from './College_admission.js';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 

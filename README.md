@@ -124,5 +124,4 @@ The model can be further enhanced by incorporating additional factors such as fi
 **This tool is for educational and demonstration purposes only.**
 - The model uses simplified logic and historical data to estimate admission probabilities and optimal strategies.
 - Actual college admissions decisions depend on many factors not captured here (e.g., essays, extracurriculars, recommendations, holistic review, changing policies, etc.).
-- src/processing.py is currently not needed but will be used in the future.
 
