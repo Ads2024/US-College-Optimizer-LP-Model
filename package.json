@@ -19,6 +19,11 @@
     "react-scripts": "5.0.1",
     "recharts": "^2.1.9"
   },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.35",
+    "autoprefixer": "^10.4.17"
+  },
   "browserslist": {
     "production": [
       ">0.2%",

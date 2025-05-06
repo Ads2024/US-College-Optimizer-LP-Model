@@ -1,27 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import csvData from './College_admission.js';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-
-const COLLEGE_NAMES = {
-  1: 'Top Tier University',
-  2: 'High Tier University',
-  3: 'Mid Tier University',
-  4: 'Regular University'
-};
-
-const PRESTIGE_SCORES = {
-  1: 1.0,
-  2: 0.75,
-  3: 0.5,
-  4: 0.25
-};
-
-const STRATEGIES = {
-  "risk-averse": { admission_prob: 0.9, prestige: 0.1 },
-  "balanced": { admission_prob: 0.7, prestige: 0.3 },
-  "prestige-focused": { admission_prob: 0.3, prestige: 0.7 }
-};
+import csvData from './College_admission.js';
 
 // Helper to parse CSV string to array of objects
 function parseCSV(csv) {
@@ -51,6 +30,13 @@ function std(arr) {
 // Calculate summary statistics from CSV data
 function getCollegeStats(data) {
   const stats = {};
+  const COLLEGE_NAMES = {
+    1: 'Top Tier University',
+    2: 'High Tier University',
+    3: 'Mid Tier University',
+    4: 'Regular University'
+  };
+  
   [1, 2, 3, 4].forEach(rank => {
     const rankData = data.filter(d => d.rank === rank);
     const admitted = rankData.filter(d => d.admit === 1);
@@ -64,13 +50,13 @@ function getCollegeStats(data) {
       gpa_threshold: gpa_threshold,
       gpa_admitted_mean: gpa_admitted_mean,
       gpa_admitted_std: gpa_admitted_std,
-      prestige_score: PRESTIGE_SCORES[rank]
+      prestige_score: (5 - rank) / 4 // Normalized prestige score
     };
   });
   return stats;
 }
 
-const App = () => {
+const CollegeOptimizer = () => {
   const [studentGpa, setStudentGpa] = useState(3.5);
   const [strategy, setStrategy] = useState("balanced");
   const [results, setResults] = useState([]);
@@ -84,13 +70,22 @@ const App = () => {
     setColleges(stats);
   }, []);
 
+  // Define the different weighting strategies
+  const strategies = {
+    "risk-averse": { admission_prob: 0.9, prestige: 0.1 },
+    "balanced": { admission_prob: 0.7, prestige: 0.3 },
+    "prestige-focused": { admission_prob: 0.3, prestige: 0.7 }
+  };
+
   // Calculate admission probability for all colleges based on GPA
   const calculateAdmissionProbabilities = (gpa) => {
+    if (!colleges) return {};
+    
     const collegeWithProbs = {};
-
+    
     for (const [rank, college] of Object.entries(colleges)) {
       let admissionProb;
-
+      
       if (gpa >= college.gpa_threshold) {
         const zScore = (gpa - college.gpa_admitted_mean) / college.gpa_admitted_std;
         admissionProb = college.admission_rate * (1 + 0.1 * zScore);
@@ -99,24 +94,26 @@ const App = () => {
         const deficit = college.gpa_threshold - gpa;
         admissionProb = Math.max(0.05, college.admission_rate * (1 - deficit)); // Minimum 5%
       }
-
+      
       collegeWithProbs[rank] = {
         ...college,
         admission_prob: admissionProb
       };
     }
-
+    
     return collegeWithProbs;
   };
 
   // Solve the LP model (simplified greedy approach for the UI)
   const solveModel = (gpa, strategy, maxApps) => {
+    if (!colleges) return [];
+    
     const collegesWithProbs = calculateAdmissionProbabilities(gpa);
-    const weights = STRATEGIES[strategy];
-
+    const weights = strategies[strategy];
+    
     // Calculate utility for each college
     const collegesWithUtility = Object.entries(collegesWithProbs).map(([rank, college]) => {
-      const utility = weights.admission_prob * college.admission_prob +
+      const utility = weights.admission_prob * college.admission_prob + 
                       weights.prestige * college.prestige_score;
       return {
         rank: parseInt(rank),
@@ -126,20 +123,19 @@ const App = () => {
         utility
       };
     });
-
+    
     // Sort by utility (descending)
     collegesWithUtility.sort((a, b) => b.utility - a.utility);
-
+    
     // Select top N colleges based on max applications
     return collegesWithUtility.slice(0, maxApps);
   };
 
-  // Update results when inputs or colleges change
+  // Update results when inputs change
   useEffect(() => {
     if (!colleges) return;
     const newResults = solveModel(studentGpa, strategy, maxApplications);
     setResults(newResults);
-    // eslint-disable-next-line
   }, [studentGpa, strategy, maxApplications, colleges]);
 
   // Prepare data for bar chart
@@ -152,131 +148,151 @@ const App = () => {
     }));
   };
 
+  if (!colleges) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-100 flex items-center justify-center">
+        <div className="text-xl text-indigo-400">Loading college data...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 max-w-5xl mx-auto bg-white rounded-lg shadow">
-      <h1 className="text-2xl font-bold mb-6 text-center">College Admission Optimizer (LP Model)</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="p-4 bg-gray-50 rounded">
-          <h2 className="text-lg font-semibold mb-2">Student Profile</h2>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">GPA (0-4.0)</label>
-            <input
-              type="range"
-              min="2.0"
-              max="4.0"
-              step="0.05"
-              value={studentGpa}
-              onChange={(e) => setStudentGpa(parseFloat(e.target.value))}
-              className="w-full"
-            />
-            <div className="flex justify-between">
-              <span className="text-sm">2.0</span>
-              <span className="font-medium">{studentGpa.toFixed(2)}</span>
-              <span className="text-sm">4.0</span>
+    <div className="min-h-screen bg-gray-900 text-gray-100">
+      <div className="p-6 max-w-5xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8 text-center text-indigo-400">
+          College Admission Optimizer
+          <span className="block text-sm text-indigo-300 mt-2">(LP Model)</span>
+        </h1>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700 hover:border-indigo-500 transition-colors">
+            <h2 className="text-xl font-semibold mb-4 text-indigo-300">Student Profile</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-gray-300">GPA (0-4.0)</label>
+              <input
+                type="range"
+                min="2.0"
+                max="4.0"
+                step="0.05"
+                value={studentGpa}
+                onChange={(e) => setStudentGpa(parseFloat(e.target.value))}
+                className="w-full accent-indigo-500"
+              />
+              <div className="flex justify-between mt-2">
+                <span className="text-sm text-gray-400">2.0</span>
+                <span className="font-medium text-indigo-400">{studentGpa.toFixed(2)}</span>
+                <span className="text-sm text-gray-400">4.0</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700 hover:border-indigo-500 transition-colors">
+            <h2 className="text-xl font-semibold mb-4 text-indigo-300">Strategy</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-gray-300">Application Strategy</label>
+              <select
+                value={strategy}
+                onChange={(e) => setStrategy(e.target.value)}
+                className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-gray-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="risk-averse">Risk-Averse (90% admission, 10% prestige)</option>
+                <option value="balanced">Balanced (70% admission, 30% prestige)</option>
+                <option value="prestige-focused">Prestige-Focused (30% admission, 70% prestige)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700 hover:border-indigo-500 transition-colors">
+            <h2 className="text-xl font-semibold mb-4 text-indigo-300">Constraints</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-gray-300">Maximum Applications</label>
+              <input
+                type="range"
+                min="1"
+                max="4"
+                step="1"
+                value={maxApplications}
+                onChange={(e) => setMaxApplications(parseInt(e.target.value))}
+                className="w-full accent-indigo-500"
+              />
+              <div className="flex justify-between mt-2">
+                <span className="text-sm text-gray-400">1</span>
+                <span className="font-medium text-indigo-400">{maxApplications}</span>
+                <span className="text-sm text-gray-400">4</span>
+              </div>
             </div>
           </div>
         </div>
-
-        <div className="p-4 bg-gray-50 rounded">
-          <h2 className="text-lg font-semibold mb-2">Strategy</h2>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Application Strategy</label>
-            <select
-              value={strategy}
-              onChange={(e) => setStrategy(e.target.value)}
-              className="w-full p-2 border rounded"
-            >
-              <option value="risk-averse">Risk-Averse (90% admission, 10% prestige)</option>
-              <option value="balanced">Balanced (70% admission, 30% prestige)</option>
-              <option value="prestige-focused">Prestige-Focused (30% admission, 70% prestige)</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="p-4 bg-gray-50 rounded">
-          <h2 className="text-lg font-semibold mb-2">Constraints</h2>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Maximum Applications</label>
-            <input
-              type="range"
-              min="1"
-              max="4"
-              step="1"
-              value={maxApplications}
-              onChange={(e) => setMaxApplications(parseInt(e.target.value))}
-              className="w-full"
-            />
-            <div className="flex justify-between">
-              <span className="text-sm">1</span>
-              <span className="font-medium">{maxApplications}</span>
-              <span className="text-sm">4</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold mb-2">Optimal College Choices</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">College</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admission Probability</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prestige Score</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utility Score</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {results.map((college) => (
-                <tr key={college.rank}>
-                  <td className="px-6 py-4 whitespace-nowrap">{college.rank}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{college.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{(college.admission_prob * 100).toFixed(1)}%</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{(college.prestige_score * 100).toFixed(1)}%</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{(college.utility * 100).toFixed(1)}%</td>
+        
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-indigo-300">Optimal College Choices</h2>
+          <div className="overflow-x-auto rounded-lg shadow-lg">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead className="bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-indigo-300 uppercase tracking-wider">Rank</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-indigo-300 uppercase tracking-wider">College</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-indigo-300 uppercase tracking-wider">Admission Probability</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-indigo-300 uppercase tracking-wider">Prestige Score</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-indigo-300 uppercase tracking-wider">Utility Score</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-gray-800 divide-y divide-gray-700">
+                {results.map((college) => (
+                  <tr key={college.rank} className="hover:bg-gray-700 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-300">{college.rank}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-300">{college.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-emerald-400">{(college.admission_prob * 100).toFixed(1)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-amber-400">{(college.prestige_score * 100).toFixed(1)}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-indigo-400">{(college.utility * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-
-      <div className="h-64 mb-6">
-        <h2 className="text-lg font-semibold mb-2">Comparative Analysis</h2>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={getChartData()} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis label={{ value: 'Score (%)', angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="admissionProbability" name="Admission Probability (%)" fill="#8884d8" />
-            <Bar dataKey="prestigeScore" name="Prestige Score (%)" fill="#82ca9d" />
-            <Bar dataKey="utility" name="Utility Score (%)" fill="#ffc658" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <h2 className="text-lg font-semibold mb-2">LP Model Explanation</h2>
-        <p className="mb-2">
-          This interactive dashboard implements a simplified version of a Linear Programming (LP) model for optimizing college application strategies. The model:
-        </p>
-        <ul className="list-disc pl-6 mb-2 space-y-1">
-          <li>Calculates admission probabilities based on your GPA relative to each college's threshold</li>
-          <li>Applies weights based on your selected strategy (risk-averse, balanced, or prestige-focused)</li>
-          <li>Computes a utility score for each college that combines admission probability and prestige</li>
-          <li>Selects the top colleges that maximize your total utility while respecting your maximum application limit</li>
-        </ul>
-        <p>
-          Adjust the sliders and dropdown to see how different GPA levels and strategies affect your optimal college choices.
-        </p>
+        
+        <div className="h-80 mb-8 bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+          <h2 className="text-xl font-semibold mb-4 text-indigo-300">Comparative Analysis</h2>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={getChartData()} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="name" stroke="#9CA3AF" />
+              <YAxis label={{ value: 'Score (%)', angle: -90, position: 'insideLeft', fill: '#9CA3AF' }} stroke="#9CA3AF" />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#1F2937',
+                  border: '1px solid #374151',
+                  borderRadius: '0.375rem',
+                  color: '#F3F4F6'
+                }}
+              />
+              <Legend />
+              <Bar dataKey="admissionProbability" name="Admission Probability (%)" fill="#10B981" />
+              <Bar dataKey="prestigeScore" name="Prestige Score (%)" fill="#F59E0B" />
+              <Bar dataKey="utility" name="Utility Score (%)" fill="#6366F1" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+          <h2 className="text-xl font-semibold mb-4 text-indigo-300">LP Model Explanation</h2>
+          <p className="mb-4 text-gray-300">
+            This interactive dashboard implements a simplified version of a Linear Programming (LP) model for optimizing college application strategies. The model:
+          </p>
+          <ul className="list-disc pl-6 mb-4 space-y-2 text-gray-300">
+            <li>Calculates admission probabilities based on your GPA relative to each college's threshold</li>
+            <li>Applies weights based on your selected strategy (risk-averse, balanced, or prestige-focused)</li>
+            <li>Computes a utility score for each college that combines admission probability and prestige</li>
+            <li>Selects the top colleges that maximize your total utility while respecting your maximum application limit</li>
+          </ul>
+          <p className="text-gray-300">
+            Adjust the sliders and dropdown to see how different GPA levels and strategies affect your optimal college choices.
+          </p>
+        </div>
       </div>
     </div>
   );
 };
 
-export default App;
+export default CollegeOptimizer;
