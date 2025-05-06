@@ -1,3 +1,4 @@
+const csvData =`
 admit,gre,gpa,ses,Gender_Male,Race,rank
 0,380,3.61,1,0,3,3
 1,660,3.67,2,0,2,3
@@ -399,3 +400,5 @@ admit,gre,gpa,ses,Gender_Male,Race,rank
 0,460,2.63,3,0,2,2
 0,700,3.65,1,1,1,2
 0,600,3.89,2,1,3,3
+`
+export default csvData
